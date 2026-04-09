@@ -1,82 +1,109 @@
 import { useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "../convex/_generated/api";
 
 export default function App() {
   // =============================
-  // STATE (you can add more)
+  // STATE
   // =============================
-
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // =============================
-  // AI FUNCTION (ADD LATER)
+  // CONVEX ACTIONS
   // =============================
+  const extractText = useAction(api.ocr.extractText);
+  const processVoice = useAction(api.voice.processVoice);
 
-  const handleAskAI = async () => {
-    // TODO:
-    // 1. Call Gemini API
-    // 2. Send "input"
-    // 3. Set response to "output"
+  // =============================
+  // OCR HANDLER
+  // =============================
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    console.log("Call AI here with:", input);
+    const reader = new FileReader();
+
+    reader.onloadend = async () => {
+      const base64 = reader.result.split(",")[1];
+
+      setLoading(true);
+
+      try {
+        const result = await extractText({
+          base64Image: base64,
+          mimeType: file.type,
+        });
+
+        setOutput(result);
+      } catch (error) {
+        console.error(error);
+        setOutput("Error extracting text");
+      }
+
+      setLoading(false);
+    };
+
+    reader.readAsDataURL(file);
   };
 
   // =============================
-  // VOICE (OPTIONAL)
+  // VOICE HANDLER
   // =============================
-
   const handleVoice = () => {
-    // TODO:
-    // Use browser speech recognition
-    // Set transcript → input
-  };
+    const recognition = new window.webkitSpeechRecognition();
 
-  // =============================
-  // OCR (OPTIONAL)
-  // =============================
+    recognition.onresult = async (event) => {
+      const transcript = event.results[0][0].transcript;
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+      setInput(transcript);
+      setLoading(true);
 
-    // TODO:
-    // 1. Convert image to base64
-    // 2. Send to AI
-    // 3. Extract text → output
+      try {
+        const result = await processVoice({ transcript });
+        setOutput(result);
+      } catch (error) {
+        console.error(error);
+        setOutput("Error processing voice");
+      }
+
+      setLoading(false);
+    };
+
+    recognition.start();
   };
 
   // =============================
   // UI
   // =============================
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
       <div className="bg-white shadow-md rounded-xl p-6 w-full max-w-lg">
         <h1 className="text-2xl font-bold text-center mb-4">
-          Advanced API App
+          Advanced API App (Answer Key)
         </h1>
 
-        {/* =============================
-          INPUT
-        ============================= */}
+        {/* INPUT */}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type something..."
+          placeholder="Voice input will appear here..."
           className="w-full border p-2 rounded mb-3"
         />
 
-        {/* =============================
-          BUTTONS
-        ============================= */}
-        <div>
-          {/* REQUIRED */}
-          <button onClick={handleAskAI}>Ask AI</button>
+        {/* BUTTONS */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {/* VOICE */}
+          <button
+            onClick={handleVoice}
+            className="bg-purple-500 text-white px-4 py-2 rounded"
+          >
+            Use Voice
+          </button>
 
-          {/* OPTIONAL */}
-          <button onClick={handleVoice}>Use Voice</button>
-
-          {/* OPTIONAL */}
-          <label>
+          {/* OCR */}
+          <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer">
             Upload Image
             <input
               type="file"
@@ -87,20 +114,9 @@ export default function App() {
           </label>
         </div>
 
-        {/* =============================
-          OUTPUT
-        ============================= */}
+        {/* OUTPUT */}
         <div className="border p-3 rounded bg-gray-50 min-h-[100px]">
-          {output || "Your result will appear here"}
-        </div>
-
-        {/* =============================
-          INSTRUCTIONS
-        ============================= */}
-        <div className="mt-4 text-sm text-gray-500">
-          <p> Step 1: Get input working</p>
-          <p> Step 2: Connect AI API</p>
-          <p> Step 3: Add voice or OCR</p>
+          {loading ? "Loading..." : output || "Result will appear here"}
         </div>
       </div>
     </div>
